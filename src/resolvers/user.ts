@@ -13,21 +13,11 @@ import {
 
 import { User } from '../entities/User';
 import { MyContext } from '../types';
+import { validateRegister } from '../utils/validateRegister';
+import { RegisterInput } from './RegisterInput';
 
 @InputType()
 class LoginInput {
-  @Field()
-  email: string;
-
-  @Field()
-  password: string;
-}
-
-@InputType()
-class RegisterInput {
-  @Field()
-  username: string;
-
   @Field()
   email: string;
 
@@ -71,43 +61,9 @@ export class UserResolver {
     @Arg('options') options: RegisterInput,
     @Ctx() { em, req }: MyContext,
   ): Promise<UserResponse> {
-    const validateEmail = (email: string) => {
-      let regexEmail = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-
-      return !!email && typeof email === 'string' && email.match(regexEmail);
-    };
-
-    if (options.username.length <= 2) {
-      return {
-        errors: [
-          {
-            field: 'username',
-            message: 'length must be greater than 2',
-          },
-        ],
-      };
-    }
-
-    if (!validateEmail(options.email)) {
-      return {
-        errors: [
-          {
-            field: 'email',
-            message: 'must be a valid email address',
-          },
-        ],
-      };
-    }
-
-    if (options.password.length <= 3) {
-      return {
-        errors: [
-          {
-            field: 'pasword',
-            message: 'length must be greater than 3',
-          },
-        ],
-      };
+    const errors = validateRegister(options);
+    if (errors) {
+      return { errors };
     }
 
     const hashedPassword = await argon2.hash(options.password);
