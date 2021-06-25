@@ -15,9 +15,21 @@ import { User } from '../entities/User';
 import { MyContext } from '../types';
 
 @InputType()
-class UsernamePasswordInput {
+class LoginInput {
+  @Field()
+  email: string;
+
+  @Field()
+  password: string;
+}
+
+@InputType()
+class RegisterInput {
   @Field()
   username: string;
+
+  @Field()
+  email: string;
 
   @Field()
   password: string;
@@ -56,15 +68,32 @@ export class UserResolver {
 
   @Mutation(() => UserResponse)
   async register(
-    @Arg('options') options: UsernamePasswordInput,
+    @Arg('options') options: RegisterInput,
     @Ctx() { em, req }: MyContext,
   ): Promise<UserResponse> {
+    const validateEmail = (email: string) => {
+      let regexEmail = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+
+      return !!email && typeof email === 'string' && email.match(regexEmail);
+    };
+
     if (options.username.length <= 2) {
       return {
         errors: [
           {
             field: 'username',
             message: 'length must be greater than 2',
+          },
+        ],
+      };
+    }
+
+    if (!validateEmail(options.email)) {
+      return {
+        errors: [
+          {
+            field: 'email',
+            message: 'must be a valid email address',
           },
         ],
       };
@@ -85,6 +114,7 @@ export class UserResolver {
 
     const user = em.create(User, {
       username: options.username,
+      email: options.email,
       password: hashedPassword,
     });
 
@@ -95,8 +125,8 @@ export class UserResolver {
         return {
           errors: [
             {
-              field: 'username',
-              message: 'username already taken',
+              field: 'email',
+              message: 'email already taken',
             },
           ],
         };
@@ -113,17 +143,17 @@ export class UserResolver {
 
   @Mutation(() => UserResponse)
   async login(
-    @Arg('options') options: UsernamePasswordInput,
+    @Arg('options') options: LoginInput,
     @Ctx() { em, req }: MyContext,
   ): Promise<UserResponse> {
-    const user = await em.findOne(User, { username: options.username });
+    const user = await em.findOne(User, { email: options.email });
 
     if (!user) {
       return {
         errors: [
           {
-            field: 'username',
-            message: 'that username doesn´t exist',
+            field: 'email',
+            message: 'that user doesn´t exist',
           },
         ],
       };
@@ -156,7 +186,7 @@ export class UserResolver {
   @Mutation(() => Boolean)
   logout(@Ctx() { req, res }: MyContext) {
     return new Promise((resolve) =>
-      req.session.destroy((err) => {
+      req.session.destroy((err: any) => {
         res.clearCookie(COOKIE_NAME);
         if (err) {
           resolve(false);
